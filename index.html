@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>IP & Device Info Finder</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      color: #fff;
+      padding: 2rem;
+      text-align: center;
+      overflow-x: hidden;
+    }
+
+    h1 {
+      color: #4fc3f7;
+      animation: fadeIn 2s ease-in-out;
+    }
+
+    .card {
+      background: #1e1e1e;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin: 2rem auto;
+      width: 90%;
+      max-width: 750px;
+      box-shadow: 0 0 25px #000;
+      opacity: 0;
+      transform: translateY(30px);
+      transition: 1s ease;
+    }
+
+    .card.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .label {
+      font-weight: bold;
+      color: #90caf9;
+    }
+
+    .btn {
+      margin-top: 1.5rem;
+      padding: 12px 25px;
+      border: none;
+      background: #4fc3f7;
+      color: #000;
+      border-radius: 8px;
+      font-weight: bold;
+      cursor: pointer;
+      text-decoration: none;
+      transition: 0.3s;
+    }
+
+    .btn:hover {
+      background: #29b6f6;
+    }
+
+    #qr {
+      margin-top: 1.5rem;
+      display: none;
+    }
+
+    .loading {
+      font-size: 1.2rem;
+      color: #ccc;
+      animation: blink 1s infinite;
+    }
+
+    @keyframes blink {
+      0% { opacity: 1; }
+      50% { opacity: 0.4; }
+      100% { opacity: 1; }
+    }
+
+    @keyframes fadeIn {
+      0% { opacity: 0; transform: scale(0.95); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+  <h1>🛰️ IP & Device Info Finder</h1>
+
+  <button class="btn" onclick="startDetection()">🚀 Start Detection</button>
+  <p id="loading" class="loading" style="display:none;">Starting... Please wait ⏳</p>
+
+  <div class="card" id="infoCard">
+    <p><span class="label">Browser Username:</span> <span id="username">Waiting...</span></p>
+    <p><span class="label">Local IP:</span> <span id="local-ip">Waiting...</span></p>
+    <p><span class="label">External IPv4:</span> <span id="external-ipv4">Waiting...</span></p>
+    <p><span class="label">External IPv6:</span> <span id="external-ipv6">Waiting...</span></p>
+    <p><span class="label">VPN/Proxy:</span> <span id="vpn-status">Checking...</span></p>
+    <p><span class="label">Country:</span> <span id="country">...</span></p>
+    <p><span class="label">City:</span> <span id="city">...</span></p>
+    <p><span class="label">Latitude:</span> <span id="lat">...</span></p>
+    <p><span class="label">Longitude:</span> <span id="lon">...</span></p>
+    <p><span class="label">OS:</span> <span id="os">...</span></p>
+    <p><span class="label">Browser:</span> <span id="browser">...</span></p>
+    <p><span class="label">Processor:</span> <span id="processor">...</span></p>
+    <p><span class="label">RAM:</span> <span id="ram">...</span></p>
+
+    <a id="map-link" class="btn" href="#" target="_blank" style="display:none;">🌍 View on Google Maps</a>
+    <button class="btn" onclick="showQR()">📱 Show QR Code</button>
+    <div id="qr"><img id="qr-img" src="" alt="QR Code"></div>
+  </div>
+
+  <script>
+    const infoCard = document.getElementById('infoCard');
+    const loading = document.getElementById('loading');
+
+    function startDetection() {
+      loading.style.display = 'block';
+      setTimeout(() => {
+        infoCard.classList.add('visible');
+        loading.style.display = 'none';
+
+        const username = prompt("Enter your name for display:");
+        document.getElementById("username").textContent = username || "Anonymous";
+
+        detectInfo();
+      }, 2000); // Delay 2s for animation
+    }
+
+    function detectInfo() {
+      // External IPv4 & Geolocation
+      fetch('https://api.ipify.org?format=json')
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById('external-ipv4').textContent = data.ip;
+
+          return fetch(`https://ipapi.co/${data.ip}/json/`);
+        })
+        .then(res => res.json())
+        .then(loc => {
+          document.getElementById('country').textContent = loc.country_name;
+          document.getElementById('city').textContent = loc.city;
+          document.getElementById('lat').textContent = loc.latitude;
+          document.getElementById('lon').textContent = loc.longitude;
+          document.getElementById('map-link').href = `https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`;
+          document.getElementById('map-link').style.display = 'inline-block';
+        });
+
+      // External IPv6
+      fetch('https://api64.ipify.org?format=json')
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById('external-ipv6').textContent = data.ip;
+        });
+
+      // Local IP
+      const pc = new RTCPeerConnection({ iceServers: [] });
+      pc.createDataChannel('');
+      pc.createOffer().then(offer => pc.setLocalDescription(offer));
+      pc.onicecandidate = event => {
+        if (event && event.candidate) {
+          const ipMatch = event.candidate.candidate.match(/([0-9]{1,3}(\.[0-9]{1,3}){3})/);
+          if (ipMatch) {
+            document.getElementById('local-ip').textContent = ipMatch[1];
+            pc.close();
+          }
+        }
+      };
+
+      // Basic VPN check
+      Promise.all([
+        fetch('https://api.ipify.org?format=json'),
+        fetch('https://api64.ipify.org?format=json')
+      ])
+      .then(async ([v4res, v6res]) => {
+        const ipv4 = (await v4res.json()).ip;
+        const ipv6 = (await v6res.json()).ip;
+        const vpnStatus = (ipv4 && !ipv6) ? "Possible VPN/Proxy" : "Not detected";
+        document.getElementById('vpn-status').textContent = vpnStatus;
+      });
+
+      // System Info
+      const ua = navigator.userAgent;
+      const platform = navigator.platform || "Unknown";
+      const browser = (() => {
+        if (ua.includes("Firefox")) return "Firefox";
+        if (ua.includes("Edg")) return "Edge";
+        if (ua.includes("Chrome")) return "Chrome";
+        if (ua.includes("Safari")) return "Safari";
+        return "Other";
+      })();
+      const os = (() => {
+        if (ua.includes("Win")) return "Windows";
+        if (ua.includes("Mac")) return "MacOS";
+        if (ua.includes("Linux")) return "Linux";
+        if (ua.includes("Android")) return "Android";
+        if (ua.includes("iPhone") || ua.includes("iPad")) return "iOS";
+        return "Unknown";
+      })();
+      const ram = navigator.deviceMemory ? navigator.deviceMemory + " GB" : "Unavailable";
+
+      document.getElementById("os").textContent = os;
+      document.getElementById("browser").textContent = browser;
+      document.getElementById("processor").textContent = platform;
+      document.getElementById("ram").textContent = ram;
+    }
+
+    function showQR() {
+      const data = [
+        `Local IP: ${document.getElementById("local-ip").textContent}`,
+        `IPv4: ${document.getElementById("external-ipv4").textContent}`,
+        `IPv6: ${document.getElementById("external-ipv6").textContent}`,
+        `VPN/Proxy: ${document.getElementById("vpn-status").textContent}`,
+        `Country: ${document.getElementById("country").textContent}`,
+        `City: ${document.getElementById("city").textContent}`,
+        `Lat: ${document.getElementById("lat").textContent}`,
+        `Lon: ${document.getElementById("lon").textContent}`,
+        `OS: ${document.getElementById("os").textContent}`,
+        `Browser: ${document.getElementById("browser").textContent}`,
+        `Processor: ${document.getElementById("processor").textContent}`,
+        `RAM: ${document.getElementById("ram").textContent}`,
+        `User: ${document.getElementById("username").textContent}`
+      ].join('\n');
+
+      const qrURL = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(data)}`;
+      document.getElementById("qr-img").src = qrURL;
+      document.getElementById("qr").style.display = "block";
+    }
+  </script>
+</body>
+</html>

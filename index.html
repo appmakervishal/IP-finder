@@ -42,7 +42,7 @@
     }
 
     .btn {
-      margin-top: 1.5rem;
+      margin-top: 1rem;
       padding: 12px 25px;
       border: none;
       background: #4fc3f7;
@@ -84,7 +84,7 @@
 <body>
   <h1>🛰️ IP & Device Info Finder</h1>
 
-  <button class="btn" onclick="startDetection()">🚀 Start Detection</button>
+  <button class="btn" onclick="startDetection()">➡️ Proceed</button>
   <p id="loading" class="loading" style="display:none;">Starting... Please wait ⏳</p>
 
   <div class="card" id="infoCard">
@@ -130,7 +130,6 @@
         .then(res => res.json())
         .then(data => {
           document.getElementById('external-ipv4').textContent = data.ip;
-
           return fetch(`https://ipapi.co/${data.ip}/json/`);
         })
         .then(res => res.json())
@@ -164,7 +163,7 @@
         }
       };
 
-      // Basic VPN check
+      // VPN/Proxy check
       Promise.all([
         fetch('https://api.ipify.org?format=json'),
         fetch('https://api64.ipify.org?format=json')
@@ -176,7 +175,7 @@
         document.getElementById('vpn-status').textContent = vpnStatus;
       });
 
-      // System Info
+      // Device Info
       const ua = navigator.userAgent;
       const platform = navigator.platform || "Unknown";
       const browser = (() => {
